@@ -1,0 +1,12 @@
+{
+  "name": "example_http_game",
+  "version": "1.0.0",
+  "main": "exampleServer.js",
+  "type": "module",
+  "scripts": {
+    "start": "node exampleServer.js"
+  },
+  "author": "",
+  "license": "MIT",
+  "description": ""
+}
