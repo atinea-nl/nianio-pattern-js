@@ -1,36 +1,20 @@
+import { parse } from 'url';
+
 export const gameInitState = {}
 
 export function GameNianioFunction(state, cmd) {
     function sendMessageCmd(code, message, connectinId) {
         return { 'ov.HttpWorker': {
             'ConnectinId': connectinId,
-            'Command': {
-                'ov.SendMessage': {
-                    'StatusCode': code,
-                    'Message': message,
-                }
-            }
-        }};
-    }
-
-    function sendBoardStateCmd(game, connectinId) {
-        return { 'ov.HttpWorker': {
-            'ConnectinId': connectinId,
-            'Command': {
-                'ov.SendBoardState': {
-                    'Board': game['Board'],
-                    'State': game['State'],
-                }
-            }
+            'StatusCode': code,
+            'Payload': { 'ov.Message': message },
         }};
     }
 
     function startTimerCmd(gameId, connectinId) {
         return { 'ov.TimerWorker': {
-            'ov.Start': {
-                'GameId': gameId,
-                'CallId': connectinId,
-            }
+            'GameId': gameId,
+            'CallId': connectinId,
         }};
     }
 
@@ -56,47 +40,30 @@ export function GameNianioFunction(state, cmd) {
         throw new Error(`Invalid gameState: ${gameState}`);
     }
 
-    function makeMoveFunc(state, gameId, move, connectinId) {
-        state[gameId]['LastTimerCallId']++;
-        const board = state[gameId]['Board'];
-        if (move < 0 || move > 8 || board[move] != ' ') {
+    function handleNewRequest(request) {
+        function sendBoardStateCmd(game, connectinId) {
             return {
-                'state': state,
-                'extCmds': [
-                    sendMessageCmd(400, 'Invalid Move', connectinId),
-                    startTimerCmd(gameId, state[gameId]['LastTimerCallId']),
-                ],
+                'ov.HttpWorker': {
+                    'ConnectinId': connectinId,
+                    'StatusCode': 200,
+                    'Payload': {
+                        'ov.BoardState': {
+                            'Board': game['Board'],
+                            'State': game['State'],
+                        }
+                    }
+                }
+            };
+        }
+
+        function handleStartNewGame(pathSegments, connectinId) {
+            if (pathSegments.length !== 2) {
+                return {
+                    'state': state,
+                    'extCmds': [sendMessageCmd(400, 'Invalid start endpoint', connectinId)],
+                };
             }
-        }
 
-        board[move] = 'X';
-        let boardState = getBoardState(board);
-
-        if (boardState == 'ov.Playing') {
-            const oponentMove = board.flat().findIndex(b => b == ' ');
-            board[oponentMove] = 'O';
-            boardState = getBoardState(board);
-        }
-
-        state[gameId]['Board'] = board;
-        state[gameId]['State'] = {};
-        state[gameId]['State'][boardState] = null;
-
-        return {
-            'state': state,
-            'extCmds': [
-                sendBoardStateCmd(state[gameId], connectinId),
-                startTimerCmd(gameId, connectinId),
-            ]
-        }
-    }
-
-    if (Object.hasOwn(cmd, 'ov.HttpWorker')) {
-        const connectinId = cmd['ov.HttpWorker']['ConnectinId'];
-        const gameId = cmd['ov.HttpWorker']['GameId'];
-        const command = cmd['ov.HttpWorker']['Command'];
-
-        if (Object.hasOwn(command, 'ov.StartGame')) {
             if (Object.hasOwn(state, gameId)) {
                 const answer = getStateDescription(state[gameId]['State']);
                 return {
@@ -117,11 +84,64 @@ export function GameNianioFunction(state, cmd) {
                     ],
                 }
             }
-        } else if (Object.hasOwn(command, 'ov.MakeMove')) {
+        }
+
+        function handleMove(pathSegments, connectinId) {
+
+            function makeMoveFunc(gameId, move, connectinId) {
+                state[gameId]['LastTimerCallId']++;
+                const board = state[gameId]['Board'];
+                if (move < 0 || move > 8 || board[move] != ' ') {
+                    return {
+                        'state': state,
+                        'extCmds': [
+                            sendMessageCmd(400, 'Invalid Move', connectinId),
+                            startTimerCmd(gameId, state[gameId]['LastTimerCallId']),
+                        ],
+                    }
+                }
+
+                board[move] = 'X';
+                let boardState = getBoardState(board);
+
+                if (boardState == 'ov.Playing') {
+                    const oponentMove = board.flat().findIndex(b => b == ' ');
+                    board[oponentMove] = 'O';
+                    boardState = getBoardState(board);
+                }
+
+                state[gameId]['Board'] = board;
+                state[gameId]['State'] = {};
+                state[gameId]['State'][boardState] = null;
+
+                return {
+                    'state': state,
+                    'extCmds': [
+                        sendBoardStateCmd(state[gameId], connectinId),
+                        startTimerCmd(gameId, connectinId),
+                    ]
+                }
+            }
+
+            if (pathSegments.length !== 3) {
+                return {
+                    'state': state,
+                    'extCmds': [sendMessageCmd(400, 'Invalid move endpoint', connectinId)],
+                };
+            }
+
+            const moveId = parseInt(pathSegments[2]);
+            if (isNaN(moveId)) {
+                return {
+                    'state': state,
+                    'extCmds': [sendMessageCmd(400, 'Invalid moveId', connectinId)],
+                };
+            }
+
             if (Object.hasOwn(state, gameId)) {
                 const gameState = state[gameId]['State'];
                 if (Object.hasOwn(gameState, 'ov.Playing')) {
-                    return makeMoveFunc(state, gameId, command['ov.MakeMove'], connectinId);
+                    return makeMoveFunc(gameId, moveId, connectinId);
                 } else {
                     return {
                         'state': state,
@@ -134,7 +154,16 @@ export function GameNianioFunction(state, cmd) {
                     'extCmds': [sendMessageCmd(400, 'Game not started', connectinId)],
                 };
             }
-        } else if (Object.hasOwn(command, 'ov.EndGame')) {
+        }
+
+        function handleEndGame(pathSegments, connectinId) {
+            if (pathSegments.length !== 2) {
+                return {
+                    'state': state,
+                    'extCmds': [sendMessageCmd(400, 'Invalid end endpoint', connectinId)],
+                };
+            }
+
             if (Object.hasOwn(state, gameId)) {
                 const gameState = state[gameId]['State'];
                 if (Object.hasOwn(gameState, 'ov.Playing')) {
@@ -155,26 +184,70 @@ export function GameNianioFunction(state, cmd) {
                     'extCmds': [sendMessageCmd(400, 'Game not started', connectinId)],
                 };
             }
-        } else {
-            throw new Error(`Invalid command: ${command}`);
         }
-    } else if (Object.hasOwn(cmd, 'ov.TimerWorker')) {
-        if (Object.hasOwn(cmd['ov.TimerWorker'], 'ov.TimeOut')) {
-            const callId = cmd['ov.TimerWorker']['ov.TimeOut']['CallId'];
-            const gameId = cmd['ov.TimerWorker']['ov.TimeOut']['GameId'];
-            const lastTimerCallId = state[gameId]['LastTimerCallId'];
-            const gameState = state[gameId]['State'];
-            if (Object.hasOwn(gameState, 'ov.Playing') && lastTimerCallId == callId) {
-                state[gameId]['State'] = { 'ov.TimeOut': null };
-            }
+
+        const connectinId = request['ConnectinId'];
+        const url = request['Url'];
+        const parsedUrl = parse(url || '', true);
+        const pathname = parsedUrl.pathname || '';
+        const pathSegments = pathname.split('/').filter(segment => segment.length > 0);
+
+        if (pathSegments.length < 2) {
             return {
                 'state': state,
-                'extCmds': [],
-            }
-        } else {
-            throw new Error(`Invalid cmd['ov.TimerWorker']: ${cmd['ov.TimerWorker']}`);
+                'extCmds': [sendMessageCmd(400, 'Invalid URL structure', connectinId)],
+            };
         }
+
+        const gameId = pathSegments[0];
+        const action = pathSegments[1];
+
+        if (!gameId) {
+            return {
+                'state': state,
+                'extCmds': [sendMessageCmd(400, 'Missing gameId', connectinId)],
+            };
+        }
+
+        if (action === 'start') return handleStartNewGame(pathSegments, connectinId);
+        else if (action === 'move') return handleMove(pathSegments, connectinId);
+        else if (action === 'end') return handleEndGame(pathSegments, connectinId);
+        else {
+            return {
+                'state': state,
+                'extCmds': [sendMessageCmd(400, 'Bad action', connectinId)],
+            };
+        }
+    }
+
+    function handleTimerTimeOut(command) {
+        const callId = command['CallId'];
+        const gameId = command['GameId'];
+        const lastTimerCallId = state[gameId]['LastTimerCallId'];
+        const gameState = state[gameId]['State'];
+        if (Object.hasOwn(gameState, 'ov.Playing') && lastTimerCallId == callId) {
+            state[gameId]['State'] = { 'ov.TimeOut': null };
+        }
+        return {
+            'state': state,
+            'extCmds': [],
+        }
+    }
+
+    if (Object.hasOwn(cmd, 'ov.HttpWorker')) {
+        if (Object.hasOwn(cmd['ov.HttpWorker'], 'ov.NewRequest')) {
+            return handleNewRequest(cmd['ov.HttpWorker']['ov.NewRequest']);
+        } else if (Object.hasOwn(cmd['ov.HttpWorker'], 'ov.ConnectinIdDoesntExist')) {
+            // that will never happen in this implementation
+            throw new Error(`Invalid cmd: ${cmd}`);
+        } else {
+            // that will never happen in this implementation
+            throw new Error(`Invalid cmd: ${cmd}`);
+        }
+    } else if (Object.hasOwn(cmd, 'ov.TimerWorker')) {
+        return handleTimerTimeOut(cmd['ov.TimerWorker']);
     } else {
+        // that will never happen in this implementation
         throw new Error(`Invalid cmd: ${cmd}`);
     }
 }
