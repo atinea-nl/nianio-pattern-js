@@ -20,6 +20,7 @@ The library provides the `NianioStart` function that initializes and starts Nian
 - `nianioRuntime` - object with parameters (it's recomended to use default runtime from `./runtimes/`):
     - `logErrorBeforeTerminationFunc` - function that will execute itself before the nianio termination
     - `scheduleNextNianioTickFunc` - function that will execute next execution of dispatcher
+    - `deepCopy` - function used for deep copying of status and commands
 
 The library does not contain a method to stop the Nianio dispatcher - this logic is left to developers to implement in `nianioFunction`. 
 
