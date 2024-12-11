@@ -4,7 +4,7 @@
   "main": "exampleServer.js",
   "type": "module",
   "scripts": {
-    "start": "node exampleServer.js"
+    "start": "node example_http_game/exampleServer.js"
   },
   "author": "",
   "license": "MIT",

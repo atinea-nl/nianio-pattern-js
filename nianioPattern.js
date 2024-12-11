@@ -1,6 +1,6 @@
 import { jsonptd } from './lib/json-ptd.js';
 
-export default function NianioStart({ ptd, nianioFunction, initState, workerFactories, nianioRuntime }) {
+export default function NianioStart({ ptd, nianioFunc, initState, workerFactories, nianioRuntime }) {
     let state;
     let queue;
     let isScheduled;
@@ -10,10 +10,10 @@ export default function NianioStart({ ptd, nianioFunction, initState, workerFact
         try {
             while (queue.length > 0) {
                 const command = queue.pop();
-                const oldState = deepCopy(state);
-                const result = nianioFunction(oldState, command);
+                const oldState = nianioRuntime['deepCopy'](state);
+                const result = nianioFunc(oldState, command);
                 const newState = result['state'];
-                const newStateCopy = deepCopy(newState);
+                const newStateCopy = nianioRuntime['deepCopy'](newState);
                 ptdEnsure(newStateCopy, 'state');
                 state = newStateCopy;
 
@@ -21,7 +21,7 @@ export default function NianioStart({ ptd, nianioFunction, initState, workerFact
                 const extCmdsCopy = [];
 
                 for (let i = 0; i < extCmds.length; i++) {
-                    const extCmdCopy = deepCopy(extCmds[i]);
+                    const extCmdCopy = nianioRuntime['deepCopy'](extCmds[i]);
                     ptdEnsure(extCmdCopy, 'extCmd');
                     extCmdsCopy.push(extCmdCopy);
                 }
@@ -47,7 +47,7 @@ export default function NianioStart({ ptd, nianioFunction, initState, workerFact
 
     function pushCmdFromWorker(workerName) {
         return (cmd) => {
-            const cmdCopy = deepCopy(cmd);
+            const cmdCopy = nianioRuntime['deepCopy'](cmd);
             const cmdWrappedCopy = {};
             cmdWrappedCopy[`ov.${workerName}`] = cmdCopy;
             ptdEnsure(cmdWrappedCopy, 'cmd');
@@ -74,12 +74,13 @@ export default function NianioStart({ ptd, nianioFunction, initState, workerFact
         if (!Object.hasOwn(ptd, 'state') || ptd['state'] == null) throwNianioError('ptd doesn\'t have property state');
         if (!Object.hasOwn(ptd, 'cmd') || ptd['cmd'] == null) throwNianioError('ptd doesn\'t have property cmd');
         if (!Object.hasOwn(ptd, 'extCmd') || ptd['extCmd'] == null) throwNianioError('ptd doesn\'t have property extCmd');
-        if (nianioFunction == null) throwNianioError('nianioFunction == null');
+        if (nianioFunc == null) throwNianioError('nianioFunc == null');
         if (initState == null) throwNianioError('initState == null');
         if (workerFactories == null) throwNianioError('workerFactories == null');
         if (nianioRuntime == null) throwNianioError('nianioRuntime == null');
         if (!Object.hasOwn(nianioRuntime, 'logErrorBeforeTerminationFunc') || nianioRuntime['logErrorBeforeTerminationFunc'] == null) throwNianioError('nianioRuntime doesn\'t have property logErrorBeforeTerminationFunc');
         if (!Object.hasOwn(nianioRuntime, 'scheduleNextNianioTickFunc') || nianioRuntime['scheduleNextNianioTickFunc'] == null) throwNianioError('nianioRuntime doesn\'t have property scheduleNextNianioTickFunc');
+        if (!Object.hasOwn(nianioRuntime, 'deepCopy') || nianioRuntime['deepCopy'] == null) throwNianioError('nianioRuntime doesn\'t have property deepCopy');
     }
 
     function initWorkers() {
@@ -94,10 +95,10 @@ export default function NianioStart({ ptd, nianioFunction, initState, workerFact
     function initNianio() {
         validateInitParamiters();
 
-        ptd = deepCopy(ptd);
+        ptd = nianioRuntime['deepCopy'](ptd);
         queue = [];
         isScheduled = false;
-        const initStateCopy = deepCopy(initState);
+        const initStateCopy = nianioRuntime['deepCopy'](initState);
         ptdEnsure(initStateCopy, 'state');
         state = initStateCopy;
         
@@ -105,8 +106,4 @@ export default function NianioStart({ ptd, nianioFunction, initState, workerFact
     }
 
     initNianio();
-}
-
-function deepCopy(obj) {
-    return JSON.parse(JSON.stringify(obj));
 }

@@ -19,7 +19,7 @@ export function httpWorkerGenerator({port}) {
             }});
         });
 
-        server.listen(8000, () => console.log(`Server running at http://localhost:${port}/`));
+        server.listen(port, () => console.log(`Server running at http://localhost:${port}/`));
 
         function pushExtCmdFunc(extCmd) {
             const connectionId = extCmd['ConnectinId'];
