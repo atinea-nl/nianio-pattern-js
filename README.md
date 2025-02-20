@@ -20,6 +20,7 @@ The library provides the `NianioStart` function that initializes and starts Nian
 - `nianioRuntime` - object with parameters (it's recomended to use default runtime from `./runtimes/`):
     - `logErrorBeforeTerminationFunc` - function that will execute itself before the nianio termination
     - `scheduleNextNianioTickFunc` - function that will execute next execution of dispatcher
+    - `debugPrinter` - function that will execute after every execution of `nianioFunction`. Paramiter is an object with fields: `cmd`, `state` (new state) and `extCmds`. 
     - `deepCopy` - function used for deep copying of status and commands
 
 The library does not contain a method to stop the Nianio dispatcher - this logic is left to developers to implement in `nianioFunction`. 
@@ -56,6 +57,13 @@ function counterWorker(pushCmdFunc) {
   With that assumption library additionally ensures that:
   - Before the command reaches the worker it is unpacked from variant with his name
   - Before a command gets from a worker to the Nianio queue it is wrapped in a variant with his name
+
+### Nianio Pattern with nianiolang
+There is also a version of this library that takes the state and function of nianio written in nianiolang. A full example is available at: 
+https://github.com/nianiolang/nianiolang.github.io/tree/master/nianio-pattern-elevator
+
+This application is available on:
+https://www.nianiolang.org/nianio-pattern-elevator/
 
 ### Error handling
 In case of any exception during the dispatcher's transition (e.g. attempting to handle a command or a state that does not conform to ptd ), nianio will throw an unhandled exception with an error message. 
