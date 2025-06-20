@@ -96,8 +96,8 @@ function NianioStartWithNl({ ptd, nianioFunc, initState, workerFactories, nianio
         queue = [];
         isScheduled = false;
 
-        const initStateImm = initState();
-        _ = nl.imm_to_json(initStateImm, ptd['state'], ptd); // walidacja
+        const initStateImm = nl.json_to_imm(initState, ptd['state'], ptd); //initState ma być jsonem, a nie wskaźnikiem do Nianio
+        // _ = nl.imm_to_json(initStateImm, ptd['state'], ptd); // walidacja odbywa się już wyżej w momencie konwersji jsona do typu imm
         state = initStateImm;
 
         initWorkers();
